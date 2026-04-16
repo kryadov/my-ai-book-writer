@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:my_ai_book_writer/core/models/assistant_models.dart';
 import 'package:my_ai_book_writer/core/services/app_controller.dart';
 import 'package:my_ai_book_writer/core/services/assistant_service.dart';
 import 'package:my_ai_book_writer/core/storage/settings_storage.dart';
@@ -35,6 +36,8 @@ void main() {
       });
 
       await controller.initialize();
+
+      expect(controller.workspaceRootDirectoryPath, tempDirectory.path);
 
       expect(controller.books, isNotEmpty);
       expect(controller.activeBook, isNotNull);
@@ -157,4 +160,60 @@ void main() {
     expect(controller.activeBook, isNull);
     expect(controller.selectedScene, isNull);
   });
+
+  test(
+    'calculates current book statistics and supports page format switch',
+    () async {
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'my_ai_book_writer_controller_book_stats',
+      );
+      final settingsStorage = SettingsStorage();
+      final controller = AppController(
+        workspaceStorage: WorkspaceStorage(
+          baseDirectoryPath: tempDirectory.path,
+        ),
+        settingsStorage: settingsStorage,
+        assistantService: AssistantService(settingsStorage: settingsStorage),
+        importExportService: const ImportExportService(),
+      );
+
+      addTearDown(() async {
+        controller.dispose();
+        await tempDirectory.delete(recursive: true);
+      });
+
+      await controller.initialize();
+      controller.updateSceneContent('a' * 6000);
+
+      final activeBook = controller.activeBook;
+      expect(activeBook, isNotNull);
+
+      final a4Statistics = controller.calculateBookStatistics(
+        book: activeBook,
+        pageFormat: PageFormat.a4,
+      );
+      final compactStatistics = controller.calculateBookStatistics(
+        book: activeBook,
+        pageFormat: PageFormat.compact,
+      );
+
+      expect(a4Statistics, isNotNull);
+      expect(compactStatistics, isNotNull);
+      expect(a4Statistics!.parts, activeBook!.parts.length);
+      expect(a4Statistics.chapters, greaterThan(0));
+      expect(a4Statistics.symbols, greaterThan(0));
+      expect(
+        compactStatistics!.pages,
+        greaterThanOrEqualTo(a4Statistics.pages),
+      );
+      expect(controller.activeBookPreview, contains(activeBook.title));
+      expect(controller.activeBookExportContent, contains(activeBook.title));
+      expect(controller.activeBookExportContent, contains('Chapter'));
+
+      await controller.setPageFormat(PageFormat.compact);
+
+      expect(controller.pageFormat, PageFormat.compact);
+      expect(controller.activeBookStatistics?.pages, compactStatistics.pages);
+    },
+  );
 }

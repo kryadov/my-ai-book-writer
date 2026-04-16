@@ -12,6 +12,20 @@ import '../storage/workspace_storage.dart';
 import 'assistant_service.dart';
 import 'change_history.dart';
 
+class BookStatistics {
+  const BookStatistics({
+    required this.pages,
+    required this.parts,
+    required this.chapters,
+    required this.symbols,
+  });
+
+  final int pages;
+  final int parts;
+  final int chapters;
+  final int symbols;
+}
+
 class AppController extends ChangeNotifier {
   AppController({
     required WorkspaceStorage workspaceStorage,
@@ -46,6 +60,7 @@ class AppController extends ChangeNotifier {
     defaultScope: AssistantScope.scene,
     temperature: 0.7,
     maxTokens: 1000,
+    pageFormat: PageFormat.a4,
   );
 
   bool _isLoading = true;
@@ -55,6 +70,7 @@ class AppController extends ChangeNotifier {
   bool _assistantBusy = false;
   String _assistantOutput = '';
   String? _assistantError;
+  String? _workspaceRootDirectoryPath;
   AssistantTask _selectedTask = AssistantTask.rephrase;
   AssistantScope _selectedScope = AssistantScope.scene;
 
@@ -66,7 +82,9 @@ class AppController extends ChangeNotifier {
   String get assistantOutput => _assistantOutput;
   String? get assistantError => _assistantError;
   WorkspaceData get workspace => _workspace;
+  String? get workspaceRootDirectoryPath => _workspaceRootDirectoryPath;
   AssistantPreferences get assistantPreferences => _assistantPreferences;
+  PageFormat get pageFormat => _assistantPreferences.pageFormat;
   AssistantTask get selectedTask => _selectedTask;
   AssistantScope get selectedScope => _selectedScope;
 
@@ -106,10 +124,115 @@ class AppController extends ChangeNotifier {
 
   String get selectedSceneContent => selectedScene?.content ?? '';
 
+  BookStatistics? get activeBookStatistics {
+    return calculateBookStatistics(book: activeBook);
+  }
+
+  String get activeBookPreview {
+    final book = activeBook;
+    if (book == null) {
+      return 'No active book selected.';
+    }
+
+    final buffer = StringBuffer()..writeln(book.title);
+    final description = book.description.trim();
+    if (description.isNotEmpty) {
+      buffer
+        ..writeln()
+        ..writeln(description);
+    }
+
+    for (final part in book.parts) {
+      buffer.writeln();
+      buffer.writeln('Part ${part.order}: ${part.title}');
+      for (final chapter in part.chapters) {
+        final sceneCount = chapter.scenes.length;
+        buffer.writeln(
+          '  Chapter ${chapter.order}: ${chapter.title} ($sceneCount scenes)',
+        );
+      }
+    }
+
+    return buffer.toString().trim();
+  }
+
+  String get activeBookExportContent {
+    final book = activeBook;
+    if (book == null) {
+      return '';
+    }
+
+    final buffer = StringBuffer()..writeln(book.title);
+    final description = book.description.trim();
+    if (description.isNotEmpty) {
+      buffer
+        ..writeln()
+        ..writeln(description);
+    }
+
+    for (final part in book.parts) {
+      buffer
+        ..writeln()
+        ..writeln('Part ${part.order}: ${part.title}');
+      for (final chapter in part.chapters) {
+        buffer
+          ..writeln()
+          ..writeln('Chapter ${chapter.order}: ${chapter.title}');
+        for (final scene in chapter.scenes) {
+          final sceneTitle = scene.title.trim();
+          if (sceneTitle.isNotEmpty) {
+            buffer.writeln('Scene ${scene.order}: $sceneTitle');
+          }
+          final sceneContent = scene.content.trim();
+          if (sceneContent.isNotEmpty) {
+            buffer
+              ..writeln(sceneContent)
+              ..writeln();
+          }
+        }
+      }
+    }
+
+    return buffer.toString().trim();
+  }
+
+  BookStatistics? calculateBookStatistics({
+    required Book? book,
+    PageFormat? pageFormat,
+  }) {
+    if (book == null) {
+      return null;
+    }
+
+    var chaptersCount = 0;
+    var symbolsCount = 0;
+    for (final part in book.parts) {
+      chaptersCount += part.chapters.length;
+      for (final chapter in part.chapters) {
+        for (final scene in chapter.scenes) {
+          symbolsCount += scene.content.length;
+        }
+      }
+    }
+
+    final format = pageFormat ?? _assistantPreferences.pageFormat;
+    final pages = symbolsCount == 0
+        ? 0
+        : (symbolsCount / format.symbolsPerPage).ceil();
+
+    return BookStatistics(
+      pages: pages,
+      parts: book.parts.length,
+      chapters: chaptersCount,
+      symbols: symbolsCount,
+    );
+  }
+
   Future<void> initialize() async {
     _isLoading = true;
     notifyListeners();
 
+    _workspaceRootDirectoryPath = await _workspaceStorage.rootDirectoryPath();
     _assistantPreferences = await _settingsStorage.loadAssistantPreferences();
     final workspace =
         await _workspaceStorage.loadWorkspace() ??
@@ -167,6 +290,15 @@ class AppController extends ChangeNotifier {
   ) async {
     _assistantPreferences = preferences;
     await _settingsStorage.saveAssistantPreferences(preferences);
+    notifyListeners();
+  }
+
+  Future<void> setPageFormat(PageFormat value) async {
+    if (_assistantPreferences.pageFormat == value) {
+      return;
+    }
+    _assistantPreferences = _assistantPreferences.copyWith(pageFormat: value);
+    await _settingsStorage.saveAssistantPreferences(_assistantPreferences);
     notifyListeners();
   }
 

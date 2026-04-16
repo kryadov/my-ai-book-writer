@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/models/assistant_models.dart';
 import '../../core/services/app_controller.dart';
+import '../import_export/import_export_service.dart';
 
 Future<void> showAssistantSettingsDialog({
   required BuildContext context,
@@ -84,7 +88,7 @@ class _AssistantSettingsDialogState extends State<_AssistantSettingsDialog> {
                 children: [
                   const Expanded(
                     child: Text(
-                      'Assistant Settings',
+                      'Settings',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -105,6 +109,16 @@ class _AssistantSettingsDialogState extends State<_AssistantSettingsDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _buildBookSettingsCard(),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Assistant',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: _styleController,
                       minLines: 2,
@@ -169,6 +183,144 @@ class _AssistantSettingsDialogState extends State<_AssistantSettingsDialog> {
                     child: const Text('Save settings'),
                   ),
                 ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBookSettingsCard() {
+    final activeBook = widget.controller.activeBook;
+    final statistics = widget.controller.calculateBookStatistics(
+      book: activeBook,
+      pageFormat: _draft.pageFormat,
+    );
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Current book',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<PageFormat>(
+              value: _draft.pageFormat,
+              decoration: const InputDecoration(
+                labelText: 'Page format',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                for (final format in PageFormat.values)
+                  DropdownMenuItem<PageFormat>(
+                    value: format,
+                    child: Text(
+                      '${format.label} • ~${format.symbolsPerPage} symbols/page',
+                    ),
+                  ),
+              ],
+              onChanged: (value) {
+                if (value == null) {
+                  return;
+                }
+                setState(() {
+                  _draft = _draft.copyWith(pageFormat: value);
+                });
+              },
+            ),
+            const SizedBox(height: 12),
+            if (activeBook == null || statistics == null)
+              const Text('No active book selected.')
+            else ...[
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _StatisticChip(
+                    label: 'Pages',
+                    value: statistics.pages.toString(),
+                  ),
+                  _StatisticChip(
+                    label: 'Parts',
+                    value: statistics.parts.toString(),
+                  ),
+                  _StatisticChip(
+                    label: 'Chapters',
+                    value: statistics.chapters.toString(),
+                  ),
+                  _StatisticChip(
+                    label: 'Symbols',
+                    value: statistics.symbols.toString(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Preview',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(maxHeight: 220),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: SingleChildScrollView(
+                  child: Text(widget.controller.activeBookPreview),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            const Text(
+              'Export and workspace',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            FilledButton.tonalIcon(
+              onPressed: activeBook == null ? null : _exportActiveBookDocx,
+              icon: const Icon(Icons.file_download),
+              label: const Text('Export active book as DOCX...'),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Workspace files are stored in:',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 6),
+            SelectableText(
+              widget.controller.workspaceRootDirectoryPath ??
+                  'Loading workspace path...',
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.tonal(
+                onPressed: widget.controller.workspaceRootDirectoryPath == null
+                    ? null
+                    : () async {
+                        await Clipboard.setData(
+                          ClipboardData(
+                            text: widget.controller.workspaceRootDirectoryPath!,
+                          ),
+                        );
+                        if (!mounted) {
+                          return;
+                        }
+                        _showInfo('Workspace path copied to clipboard.');
+                      },
+                child: const Text('Copy workspace path'),
               ),
             ),
           ],
@@ -287,6 +439,87 @@ class _AssistantSettingsDialogState extends State<_AssistantSettingsDialog> {
     _apiKeyControllers[provider]!.clear();
   }
 
+  Future<void> _exportActiveBookDocx() async {
+    final book = widget.controller.activeBook;
+    if (book == null) {
+      _showInfo('No active book selected.');
+      return;
+    }
+
+    final workspacePath = widget.controller.workspaceRootDirectoryPath;
+    final suggestedPath = workspacePath == null
+        ? '${book.title}.docx'
+        : '$workspacePath${Platform.pathSeparator}${_sanitizeFileSegment(book.title)}.docx';
+    final pathController = TextEditingController(text: suggestedPath);
+
+    final path = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Export active book as DOCX'),
+          content: SizedBox(
+            width: 560,
+            child: TextField(
+              controller: pathController,
+              decoration: const InputDecoration(
+                labelText: 'DOCX output path',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(pathController.text),
+              child: const Text('Export DOCX'),
+            ),
+          ],
+        );
+      },
+    );
+    pathController.dispose();
+
+    if (path == null || path.trim().isEmpty) {
+      return;
+    }
+
+    try {
+      final output = File(path.trim());
+      await output.parent.create(recursive: true);
+      await widget.controller.exportToPath(
+        filePath: output.path,
+        content: widget.controller.activeBookExportContent,
+        format: ExportFormat.docx,
+      );
+      if (!mounted) {
+        return;
+      }
+      _showInfo('DOCX exported to: ${output.path}');
+    } on Exception catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showInfo('Export failed: $error');
+    }
+  }
+
+  String _sanitizeFileSegment(String value) {
+    final normalized = value.trim().replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    if (normalized.isEmpty) {
+      return 'book';
+    }
+    return normalized;
+  }
+
+  void _showInfo(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _save() async {
     var providers = <AiProviderType, ProviderSettings>{..._draft.providers};
 
@@ -333,7 +566,24 @@ class _AssistantSettingsDialogState extends State<_AssistantSettingsDialog> {
       defaultScope: source.defaultScope,
       temperature: source.temperature,
       maxTokens: source.maxTokens,
+      pageFormat: source.pageFormat,
       writingStyleGuidance: source.writingStyleGuidance,
+    );
+  }
+}
+
+class _StatisticChip extends StatelessWidget {
+  const _StatisticChip({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: Text(value),
+      label: Text(label),
+      visualDensity: VisualDensity.compact,
     );
   }
 }

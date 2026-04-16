@@ -2,6 +2,8 @@
 
 Desktop-first, open-source fiction writing app with continuous AI assistance.
 
+![img.png](img.png)
+
 ## Why Flutter + Dart
 
 The project uses `Flutter` on the stable channel with bundled `Dart` because it provides:
@@ -29,9 +31,32 @@ This repository currently includes a production-oriented foundation:
 - local assistant settings + API key alias storage
 - import/export service contracts with implemented text flows:
   - import: `TXT`, `Markdown`
-  - export: `Markdown`, `HTML`
+  - export: `Markdown`, `HTML`, `DOCX`
 
-Binary formats (`DOCX`, `PDF`, `EPUB`) are scaffolded by interface but not fully implemented yet.
+`PDF` and `EPUB` export adapters are scaffolded by interface but not implemented in this build.
+
+## Export DOCX and Workspace Files Location
+
+### Export active book to DOCX from UI
+
+- In the top app toolbar click `Export active book as DOCX` (download icon),
+  or open `Settings` → `Current book` → `Export active book as DOCX...`.
+- Confirm or edit the output path in the dialog and click `Export DOCX`.
+- The app generates a `.docx` file for the active book content.
+
+### Find where workspace files are stored
+
+- In the top app toolbar click `Workspace files location` (folder icon),
+  or open `Settings` → `Current book` → `Export and workspace`.
+- The dialog/section shows the exact workspace directory path and provides
+  `Copy workspace path` for quick access.
+- The workspace directory contains at least:
+  - `workspace.json` (main persisted workspace)
+  - `recovery_snapshot.json` (autosave recovery snapshot)
+
+Default workspace root is:
+
+- `${ApplicationSupportDirectory}/my_ai_book_writer`
 
 ## Project Structure
 

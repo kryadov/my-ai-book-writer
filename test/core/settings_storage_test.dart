@@ -16,6 +16,7 @@ void main() {
     expect(preferences.providers[AiProviderType.ollama]?.enabled, isTrue);
     expect(preferences.defaultScope, AssistantScope.scene);
     expect(preferences.maxTokens, greaterThan(0));
+    expect(preferences.pageFormat, PageFormat.a4);
   });
 
   test('saves and restores preferences plus API key', () async {
@@ -25,6 +26,7 @@ void main() {
       defaultScope: AssistantScope.book,
       temperature: 0.5,
       maxTokens: 1500,
+      pageFormat: PageFormat.usLetter,
       writingStyleGuidance: 'Write with concise pacing.',
     );
 
@@ -37,6 +39,7 @@ void main() {
     expect(restored.defaultScope, AssistantScope.book);
     expect(restored.temperature, 0.5);
     expect(restored.maxTokens, 1500);
+    expect(restored.pageFormat, PageFormat.usLetter);
     expect(restored.writingStyleGuidance, 'Write with concise pacing.');
     expect(apiKey, 'secret-key');
   });
