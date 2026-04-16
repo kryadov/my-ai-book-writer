@@ -210,7 +210,7 @@ class _AssistantSettingsDialogState extends State<_AssistantSettingsDialog> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<PageFormat>(
-              value: _draft.pageFormat,
+              initialValue: _draft.pageFormat,
               decoration: const InputDecoration(
                 labelText: 'Page format',
                 border: OutlineInputBorder(),

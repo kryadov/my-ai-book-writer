@@ -756,22 +756,25 @@ class _WorkspaceShellState extends State<WorkspaceShell> {
             ),
             FilledButton.tonal(
               onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: workspacePath));
+                final navigator = Navigator.of(context);
+                final clipboard = Clipboard.setData(ClipboardData(text: workspacePath));
+                await clipboard;
                 if (!mounted) {
                   return;
                 }
-                Navigator.of(context).pop();
+                navigator.pop();
                 _showInfo('Workspace path copied to clipboard.');
               },
               child: const Text('Copy path'),
             ),
             FilledButton(
               onPressed: () async {
+                final navigator = Navigator.of(context);
                 final opened = await _openDirectory(workspacePath);
                 if (!mounted) {
                   return;
                 }
-                Navigator.of(context).pop();
+                navigator.pop();
                 if (opened) {
                   _showInfo('Opened workspace folder.');
                 } else {
