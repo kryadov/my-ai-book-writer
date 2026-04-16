@@ -10,6 +10,10 @@ class WorkspaceStorage {
 
   final String? baseDirectoryPath;
 
+  Future<String> rootDirectoryPath() async {
+    return (await _rootDirectory()).path;
+  }
+
   Future<WorkspaceData?> loadWorkspace() async {
     final file = await _workspaceFile();
     if (!file.existsSync()) {

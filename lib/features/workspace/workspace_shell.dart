@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -5,6 +8,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../core/models/assistant_models.dart';
 import '../../core/models/book_models.dart';
 import '../../core/services/app_controller.dart';
+import '../import_export/import_export_service.dart';
 import '../settings/settings_dialog.dart';
 
 class WorkspaceShell extends StatefulWidget {
@@ -92,6 +96,16 @@ class _WorkspaceShellState extends State<WorkspaceShell> {
                     tooltip: 'Add book',
                     onPressed: () => widget.controller.createBook(),
                     icon: const Icon(Icons.library_add),
+                  ),
+                  IconButton(
+                    tooltip: 'Export active book as DOCX',
+                    onPressed: _showExportBookDialog,
+                    icon: const Icon(Icons.file_download),
+                  ),
+                  IconButton(
+                    tooltip: 'Workspace files location',
+                    onPressed: _showWorkspaceLocationDialog,
+                    icon: const Icon(Icons.folder_open),
                   ),
                   IconButton(
                     tooltip: _workspaceCollapsed
@@ -633,6 +647,187 @@ class _WorkspaceShellState extends State<WorkspaceShell> {
     if (shouldRemove == true) {
       widget.controller.removeBook(book.id);
     }
+  }
+
+  Future<void> _showExportBookDialog() async {
+    final book = widget.controller.activeBook;
+    if (book == null) {
+      _showInfo('Select a book before exporting.');
+      return;
+    }
+
+    final workspacePath = widget.controller.workspaceRootDirectoryPath;
+    final suggestedPath = workspacePath == null
+        ? '${book.title}.docx'
+        : '$workspacePath${Platform.pathSeparator}${_sanitizeFileSegment(book.title)}.docx';
+    final pathController = TextEditingController(text: suggestedPath);
+
+    final path = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Export active book as DOCX'),
+          content: SizedBox(
+            width: 560,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Enter full output path for the DOCX file.'),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: pathController,
+                  decoration: const InputDecoration(
+                    labelText: 'DOCX path',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Tip: keep it inside workspace folder if you want it near project data.',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(context).pop(pathController.text.trim());
+              },
+              child: const Text('Export DOCX'),
+            ),
+          ],
+        );
+      },
+    );
+    pathController.dispose();
+
+    if (path == null || path.isEmpty) {
+      return;
+    }
+
+    try {
+      final file = File(path);
+      await file.parent.create(recursive: true);
+      await widget.controller.exportToPath(
+        filePath: file.path,
+        content: widget.controller.activeBookExportContent,
+        format: ExportFormat.docx,
+      );
+      _showInfo('DOCX exported to: ${file.path}');
+    } on Exception catch (error) {
+      _showInfo('Export failed: $error');
+    }
+  }
+
+  Future<void> _showWorkspaceLocationDialog() async {
+    final workspacePath = widget.controller.workspaceRootDirectoryPath;
+    if (workspacePath == null || workspacePath.isEmpty) {
+      _showInfo('Workspace path is not available yet. Try again in a moment.');
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Workspace files location'),
+          content: SizedBox(
+            width: 560,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('All workspace files are stored in:'),
+                const SizedBox(height: 10),
+                SelectableText(workspacePath),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+            FilledButton.tonal(
+              onPressed: () async {
+                final navigator = Navigator.of(context);
+                final clipboard = Clipboard.setData(ClipboardData(text: workspacePath));
+                await clipboard;
+                if (!mounted) {
+                  return;
+                }
+                navigator.pop();
+                _showInfo('Workspace path copied to clipboard.');
+              },
+              child: const Text('Copy path'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final navigator = Navigator.of(context);
+                final opened = await _openDirectory(workspacePath);
+                if (!mounted) {
+                  return;
+                }
+                navigator.pop();
+                if (opened) {
+                  _showInfo('Opened workspace folder.');
+                } else {
+                  _showInfo(
+                    'Could not open folder automatically. Path copied to clipboard.',
+                  );
+                  await Clipboard.setData(ClipboardData(text: workspacePath));
+                }
+              },
+              child: const Text('Open folder'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<bool> _openDirectory(String directoryPath) async {
+    try {
+      if (kIsWeb) {
+        return false;
+      }
+
+      if (Platform.isWindows) {
+        await Process.run('explorer.exe', [directoryPath]);
+        return true;
+      }
+      if (Platform.isMacOS) {
+        await Process.run('open', [directoryPath]);
+        return true;
+      }
+      if (Platform.isLinux) {
+        await Process.run('xdg-open', [directoryPath]);
+        return true;
+      }
+      return false;
+    } on Exception {
+      return false;
+    }
+  }
+
+  String _sanitizeFileSegment(String value) {
+    final normalized = value.trim().replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    if (normalized.isEmpty) {
+      return 'book';
+    }
+    return normalized;
+  }
+
+  void _showInfo(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _renamePart(BookPart part) async {

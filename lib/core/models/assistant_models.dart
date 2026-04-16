@@ -17,6 +17,8 @@ enum AssistantTask {
 
 enum AssistantScope { selection, scene, chapter, book, conversation }
 
+enum PageFormat { a5, a4, usLetter, compact }
+
 extension AssistantTaskLabel on AssistantTask {
   String get label {
     switch (this) {
@@ -61,6 +63,34 @@ extension AssistantScopeLabel on AssistantScope {
         return 'Book';
       case AssistantScope.conversation:
         return 'Conversation';
+    }
+  }
+}
+
+extension PageFormatLabel on PageFormat {
+  String get label {
+    switch (this) {
+      case PageFormat.a5:
+        return 'A5';
+      case PageFormat.a4:
+        return 'A4';
+      case PageFormat.usLetter:
+        return 'US Letter';
+      case PageFormat.compact:
+        return 'Compact (mobile)';
+    }
+  }
+
+  int get symbolsPerPage {
+    switch (this) {
+      case PageFormat.a5:
+        return 1700;
+      case PageFormat.a4:
+        return 2600;
+      case PageFormat.usLetter:
+        return 2500;
+      case PageFormat.compact:
+        return 1200;
     }
   }
 }
@@ -147,6 +177,7 @@ class AssistantPreferences {
     required this.defaultScope,
     required this.temperature,
     required this.maxTokens,
+    this.pageFormat = PageFormat.a4,
     this.writingStyleGuidance = '',
   });
 
@@ -155,6 +186,7 @@ class AssistantPreferences {
   final AssistantScope defaultScope;
   final double temperature;
   final int maxTokens;
+  final PageFormat pageFormat;
   final String writingStyleGuidance;
 
   AssistantPreferences copyWith({
@@ -163,6 +195,7 @@ class AssistantPreferences {
     AssistantScope? defaultScope,
     double? temperature,
     int? maxTokens,
+    PageFormat? pageFormat,
     String? writingStyleGuidance,
   }) {
     return AssistantPreferences(
@@ -171,6 +204,7 @@ class AssistantPreferences {
       defaultScope: defaultScope ?? this.defaultScope,
       temperature: temperature ?? this.temperature,
       maxTokens: maxTokens ?? this.maxTokens,
+      pageFormat: pageFormat ?? this.pageFormat,
       writingStyleGuidance: writingStyleGuidance ?? this.writingStyleGuidance,
     );
   }
@@ -188,6 +222,7 @@ class AssistantPreferences {
       'defaultScope': defaultScope.name,
       'temperature': temperature,
       'maxTokens': maxTokens,
+      'pageFormat': pageFormat.name,
       'writingStyleGuidance': writingStyleGuidance,
     };
   }
@@ -234,6 +269,7 @@ class AssistantPreferences {
 
     final scopeName =
         json['defaultScope'] as String? ?? AssistantScope.scene.name;
+    final pageFormatName = json['pageFormat'] as String? ?? PageFormat.a4.name;
 
     return AssistantPreferences(
       providers: parsedProviders,
@@ -244,6 +280,10 @@ class AssistantPreferences {
       ),
       temperature: (json['temperature'] as num?)?.toDouble() ?? 0.7,
       maxTokens: json['maxTokens'] as int? ?? 1000,
+      pageFormat: PageFormat.values.firstWhere(
+        (item) => item.name == pageFormatName,
+        orElse: () => PageFormat.a4,
+      ),
       writingStyleGuidance: json['writingStyleGuidance'] as String? ?? '',
     );
   }

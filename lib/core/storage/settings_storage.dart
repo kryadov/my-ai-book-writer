@@ -79,6 +79,7 @@ class SettingsStorage {
       defaultScope: AssistantScope.scene,
       temperature: 0.7,
       maxTokens: 1000,
+      pageFormat: PageFormat.a4,
       writingStyleGuidance: 'Keep prose vivid, coherent, and character-driven.',
     );
   }
