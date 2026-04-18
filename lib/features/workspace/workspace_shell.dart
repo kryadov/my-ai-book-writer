@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -605,10 +607,49 @@ class _WorkspaceShellState extends State<WorkspaceShell> {
               onPressed: () => _toggleLinePrefix('> '),
               icon: const Icon(Icons.format_quote),
             ),
+            const VerticalDivider(width: 16),
+            IconButton(
+              tooltip: 'Add Image',
+              onPressed: _pickAndAddImage,
+              icon: const Icon(Icons.image),
+            ),
           ],
         ),
       ),
     );
+  }
+
+
+  Future<void> _pickAndAddImage() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+    );
+
+    if (result != null && result.files.single.path != null) {
+      final imagePath = await widget.controller.addImageToSelectedScene(
+        result.files.single.path!,
+      );
+      if (imagePath != null) {
+        final uri = Uri.file(imagePath);
+        final tag = '![image]($uri)';
+
+        final text = _editorController.text;
+        final selection = _editorController.selection;
+        final nextText = text.replaceRange(
+          selection.start,
+          selection.end,
+          tag,
+        );
+
+        _editorController.value = TextEditingValue(
+          text: nextText,
+          selection: TextSelection.collapsed(
+            offset: selection.start + tag.length,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _renameBook(Book book) async {

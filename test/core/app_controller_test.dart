@@ -216,4 +216,42 @@ void main() {
       expect(controller.activeBookStatistics?.pages, compactStatistics.pages);
     },
   );
+
+  test('can add and remove images from a scene', () async {
+    final tempDirectory = await Directory.systemTemp.createTemp(
+      'my_ai_book_writer_controller_images',
+    );
+    final settingsStorage = SettingsStorage();
+    final controller = AppController(
+      workspaceStorage: WorkspaceStorage(baseDirectoryPath: tempDirectory.path),
+      settingsStorage: settingsStorage,
+      assistantService: AssistantService(settingsStorage: settingsStorage),
+      importExportService: const ImportExportService(),
+    );
+
+    addTearDown(() async {
+      controller.dispose();
+      await tempDirectory.delete(recursive: true);
+    });
+
+    await controller.initialize();
+
+    // Create a dummy image file
+    final dummyImage = File('${tempDirectory.path}/dummy.png');
+    await dummyImage.writeAsBytes([0, 1, 2, 3]);
+
+    final sceneId = controller.selectedScene?.id;
+    expect(sceneId, isNotNull);
+    expect(controller.selectedScene?.imagePaths, isEmpty);
+
+    final imagePath = await controller.addImageToSelectedScene(dummyImage.path);
+
+    expect(controller.selectedScene?.imagePaths, isNotEmpty);
+    expect(imagePath, isNotNull);
+    expect(File(imagePath!).existsSync(), isTrue);
+    expect(imagePath, contains('images'));
+
+    controller.removeImageFromSelectedScene(imagePath);
+    expect(controller.selectedScene?.imagePaths, isEmpty);
+  });
 }

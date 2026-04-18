@@ -235,6 +235,7 @@ class Scene {
     required this.createdAt,
     required this.updatedAt,
     this.content = '',
+    this.imagePaths = const [],
   });
 
   final String id;
@@ -243,12 +244,14 @@ class Scene {
   final int order;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final List<String> imagePaths;
 
   Scene copyWith({
     String? title,
     String? content,
     int? order,
     DateTime? updatedAt,
+    List<String>? imagePaths,
   }) {
     return Scene(
       id: id,
@@ -257,6 +260,7 @@ class Scene {
       order: order ?? this.order,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      imagePaths: imagePaths ?? this.imagePaths,
     );
   }
 
@@ -268,6 +272,7 @@ class Scene {
       'order': order,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'imagePaths': imagePaths,
     };
   }
 
@@ -283,6 +288,8 @@ class Scene {
       updatedAt:
           DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
           DateTime.now(),
+      imagePaths: (json['imagePaths'] as List<dynamic>? ?? const <dynamic>[])
+          .cast<String>(),
     );
   }
 }

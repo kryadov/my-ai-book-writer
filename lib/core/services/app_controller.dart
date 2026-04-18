@@ -819,6 +819,46 @@ class AppController extends ChangeNotifier {
     updateSceneContent('${scene.content}\n$value');
   }
 
+  Future<String?> addImageToSelectedScene(String sourcePath) async {
+    final scene = selectedScene;
+    if (scene == null) {
+      return null;
+    }
+
+    final copiedFile = await _workspaceStorage.copyImageToWorkspace(sourcePath);
+    final nextImagePaths = List<String>.from(scene.imagePaths)..add(copiedFile.path);
+
+    _updateScene(
+      sceneId: scene.id,
+      imagePaths: nextImagePaths,
+      updatedAt: DateTime.now(),
+    );
+    _queueAutosave();
+    notifyListeners();
+    return copiedFile.path;
+  }
+
+  void removeImageFromSelectedScene(String imagePath) {
+    final scene = selectedScene;
+    if (scene == null) {
+      return;
+    }
+
+    final nextImagePaths =
+        scene.imagePaths.where((path) => path != imagePath).toList();
+
+    _updateScene(
+      sceneId: scene.id,
+      imagePaths: nextImagePaths,
+      updatedAt: DateTime.now(),
+    );
+
+    // Optionally delete the file from workspace if no other scene uses it.
+    // For now, keep it simple and just remove the path.
+    _queueAutosave();
+    notifyListeners();
+  }
+
   Future<void> runAssistant({String? selection}) async {
     final book = activeBook;
     final scene = selectedScene;
@@ -923,7 +963,8 @@ class AppController extends ChangeNotifier {
 
   void _updateScene({
     required String sceneId,
-    required String content,
+    String? content,
+    List<String>? imagePaths,
     required DateTime updatedAt,
   }) {
     final active = activeBook;
@@ -938,7 +979,11 @@ class AppController extends ChangeNotifier {
         final scenes = chapter.scenes
             .map(
               (scene) => scene.id == sceneId
-                  ? scene.copyWith(content: content, updatedAt: updatedAt)
+                  ? scene.copyWith(
+                      content: content ?? scene.content,
+                      imagePaths: imagePaths ?? scene.imagePaths,
+                      updatedAt: updatedAt,
+                    )
                   : scene,
             )
             .toList(growable: false);
