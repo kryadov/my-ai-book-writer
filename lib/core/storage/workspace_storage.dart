@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/book_models.dart';
@@ -62,15 +63,27 @@ class WorkspaceStorage {
   }
 
   Future<File> _workspaceFile() async {
-    return File(
-      '${(await _rootDirectory()).path}${Platform.pathSeparator}workspace.json',
-    );
+    return File(p.join((await _rootDirectory()).path, 'workspace.json'));
   }
 
   Future<File> _recoveryFile() async {
     return File(
-      '${(await _rootDirectory()).path}${Platform.pathSeparator}recovery_snapshot.json',
+      p.join((await _rootDirectory()).path, 'recovery_snapshot.json'),
     );
+  }
+
+  Future<File> copyImageToWorkspace(String sourcePath) async {
+    final root = await _rootDirectory();
+    final imagesDir = Directory(p.join(root.path, 'images'));
+    await imagesDir.create(recursive: true);
+
+    final fileName = p.basename(sourcePath);
+    final destinationPath = p.join(
+      imagesDir.path,
+      '${DateTime.now().millisecondsSinceEpoch}_$fileName',
+    );
+    final sourceFile = File(sourcePath);
+    return sourceFile.copy(destinationPath);
   }
 
   Future<Directory> _rootDirectory() async {
@@ -78,8 +91,6 @@ class WorkspaceStorage {
       return Directory(baseDirectoryPath!);
     }
     final supportDirectory = await getApplicationSupportDirectory();
-    return Directory(
-      '${supportDirectory.path}${Platform.pathSeparator}my_ai_book_writer',
-    );
+    return Directory(p.join(supportDirectory.path, 'my_ai_book_writer'));
   }
 }
