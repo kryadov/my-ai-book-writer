@@ -28,7 +28,7 @@ jobs:
         run: flutter build apk --release
 
       - name: Upload Android artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-apk
           path: build/app/outputs/flutter-apk/app-release.apk
@@ -56,7 +56,7 @@ jobs:
         run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath my-ai-book-writer-windows.zip
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-bundle
           path: my-ai-book-writer-windows.zip
