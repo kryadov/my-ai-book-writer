@@ -621,14 +621,11 @@ class _WorkspaceShellState extends State<WorkspaceShell> {
 
 
   Future<void> _pickAndAddImage() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      allowMultiple: false,
-    );
+    final file = await FilePicker.pickFile(type: FileType.image);
 
-    if (result != null && result.files.single.path != null) {
+    if (file != null && file.path != null) {
       final imagePath = await widget.controller.addImageToSelectedScene(
-        result.files.single.path!,
+        file.path!,
       );
       if (imagePath != null) {
         final uri = Uri.file(imagePath);
